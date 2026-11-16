@@ -50,7 +50,8 @@ public final class TeleportLogicGameTest implements FabricClientGameTest {
 		check(config.clickTpReach() == TeleportConfig.DEFAULT_CLICK_TP_REACH && TeleportConfig.DEFAULT_CLICK_TP_REACH == 64,
 				"Click TP reach should default to 64, got " + config.clickTpReach());
 		check(config.clickTpPreview(), "the destination preview should be on by default");
-		check(!config.singleplayerDefault() && !config.multiplayerDefault(), "Click TP defaults should be off");
+		check(config.isEnabled(), "the mod should be on by default");
+		check(config.singleplayerDefault() && config.multiplayerDefault(), "the mod should be on by default after a reset");
 		check(!config.resetOnWorldExit() && !config.resetOnGameExit(), "reset rules should be off by default");
 		check(config.multiplayerMode() == MultiplayerMode.DISABLED, "multiplayer should be disabled by default");
 		check(config.servers().isEmpty(), "the server list should be empty by default");
@@ -68,6 +69,19 @@ public final class TeleportLogicGameTest implements FabricClientGameTest {
 		check(TeleportConfig.load(path).clickTpReach() == TeleportConfig.MIN_CLICK_TP_REACH, "negative reach should be clamped and saved");
 		config.setClickTpReach(300);
 		check(TeleportConfig.load(path).clickTpReach() == 300, "reach should be saved");
+
+		// 1.0.0 had no state for the whole mod; its defaults belonged to Click TP and were written as off.
+		Path oldVersion = directory.resolve("old.json");
+		Files.writeString(oldVersion, "{\"clickTp\": true, \"singleplayerDefault\": false, \"multiplayerDefault\": false, \"resetOnWorldExit\": true}");
+		TeleportConfig migrated = TeleportConfig.load(oldVersion);
+		check(migrated.isEnabled() && migrated.singleplayerDefault() && migrated.multiplayerDefault(),
+				"a 1.0.0 config should start with the mod on and its defaults on");
+		check(migrated.isClickTpEnabled() && migrated.resetOnWorldExit(), "a 1.0.0 config should keep its other settings");
+		Path current = directory.resolve("current.json");
+		Files.writeString(current, "{\"enabled\": false, \"singleplayerDefault\": false, \"multiplayerDefault\": false}");
+		TeleportConfig kept = TeleportConfig.load(current);
+		check(!kept.isEnabled() && !kept.singleplayerDefault() && !kept.multiplayerDefault(),
+				"a current config should keep the mod's state and defaults");
 
 		Path broken = directory.resolve("broken.json");
 		Files.writeString(broken, "{ not json");

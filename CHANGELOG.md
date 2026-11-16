@@ -6,6 +6,19 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 
 ## [Unreleased]
 
+### Added
+
+- Add a state for the whole mod, on by default, with a **Toggle teleport** key binding (unbound by default) and a setting on the configuration screen. While it is off, `/tp @c` and Click TP do not move the player; `get`, the menu, `sethome` and `settemp` keep working.
+
+### Changed
+
+- The singleplayer and server defaults and the reset rules now apply to the whole mod instead of Click TP, and both defaults are on. A configuration file from 1.0.0 starts with the new defaults, because its values belonged to Click TP.
+- The Click TP key no longer changes Click TP where teleporting is disabled or turned off; it only shows why.
+
+### Fixed
+
+- Fix that `/tp @c` could not be turned off in singleplayer.
+
 ## [1.0.0+26.3] - 2026-11-16
 
 ### Added

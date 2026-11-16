@@ -32,6 +32,8 @@ A client teleport is not a server teleport. The mod moves your player on your cl
 
 ## Usage
 
+The mod is on by default in singleplayer and disabled on multiplayer servers. To turn it off, use the **Toggle teleport** key or the **Teleport** setting. While it is off, commands that would move you only report that teleporting is turned off, and Click TP does nothing. `get`, the menu, `sethome` and `settemp` do not move you and keep working.
+
 ### Commands
 
 `@c` stands for "client": the command runs on your client and never reaches the server. Every other `/tp` and `/teleport` command, such as `/tp @s ~ ~10 ~`, is sent to the server as usual.
@@ -92,7 +94,7 @@ Respawn points, home and temp are saved separately for each singleplayer world, 
 
 ### Click TP
 
-Click TP is off by default. When it is on, right-clicking a block within the Click TP reach (64 blocks by default) teleports you there instead of using the block or the item in your hand:
+Click TP is off by default and only works while the mod is on. When it is on, right-clicking a block within the Click TP reach (64 blocks by default) teleports you there instead of using the block or the item in your hand:
 
 - On the top face of a block, you land on the block.
 - On a side face, you land next to the block, at its height.
@@ -102,9 +104,10 @@ The destination is not checked, so you can end up inside blocks. Holding the rig
 
 ### Key bindings
 
-Both key bindings are under **teleport** in **Options → Controls → Key Binds** and unbound by default:
+The key bindings are under **teleport** in **Options → Controls → Key Binds** and unbound by default:
 
-- **Toggle Click TP** turns Click TP on or off and shows the new state on the action bar. On a server that the multiplayer settings rule out, it only shows that teleporting is disabled there.
+- **Toggle teleport** turns the whole mod on or off and shows the new state on the action bar. On a server that the multiplayer settings rule out, it only shows that teleporting is disabled there.
+- **Toggle Click TP** turns Click TP on or off and shows the new state on the action bar. Where teleporting is disabled or turned off, it only shows why.
 - **Open teleport Settings** opens the configuration screen. With Mod Menu installed, you can also open it from the mod list.
 
 ### Settings
@@ -113,17 +116,18 @@ All settings are saved to `config/teleport.json` as soon as you change them.
 
 | Setting | Default | Meaning |
 | --- | --- | --- |
-| Click TP | Off | The current state, the same one the toggle key switches. |
+| Teleport | On | Whether `/tp @c` and Click TP may move you now, the same state the **Toggle teleport** key switches. |
+| Click TP | Off | Whether right-clicking a block teleports you, the same state the **Toggle Click TP** key switches. |
 | Click TP Reach | 64 | How far away, in blocks, Click TP finds the block you look at (0 to 32767). |
 | Destination Preview | On | Shows a translucent copy of you where Click TP would put you. |
-| Singleplayer Default | Off | The Click TP state a reset restores in singleplayer worlds, including worlds you open to LAN. |
-| Server Default | Off | The Click TP state a reset restores on servers that the multiplayer mode allows. |
-| Reset on World Exit | Off | Every world starts with Click TP in its default state instead of keeping the last state. |
-| Reset on Game Exit | Off | After restarting the game, the first world where the mod is allowed starts with Click TP in its default state. |
+| Singleplayer Default | On | Whether a reset turns the mod on or off in singleplayer worlds, including worlds you open to LAN. |
+| Server Default | On | Whether a reset turns the mod on or off on servers that the multiplayer mode allows. |
+| Reset on World Exit | Off | Every world starts with the mod in its default state instead of keeping the last state. |
+| Reset on Game Exit | Off | After restarting the game, the first world where the mod is allowed starts with the mod in its default state. |
 | Multiplayer mode | Disabled | **Disabled**: never teleports on servers. **Whitelist**: teleports only on servers in the server list. **Blacklist**: teleports on all servers except those in the server list. |
 | Server List | Empty | The addresses the whitelist and blacklist modes use. |
 
-The multiplayer mode is a hard limit: on a server it rules out, Click TP stays off and every command that would move you only reports that teleporting is disabled there. `get`, the menu, `sethome` and `settemp` do not move you and work everywhere. Joining another player's LAN world or a Realm counts as multiplayer.
+The multiplayer mode is a hard limit: on a server it rules out, the mod stays off whatever its state is, and every command that would move you only reports that teleporting is disabled there. `get`, the menu, `sethome` and `settemp` do not move you and work everywhere. Joining another player's LAN world or a Realm counts as multiplayer.
 
 Server list entries are compared with the address you connect to, ignoring upper and lower case. An entry without a port, such as `mc.example.com`, matches the server on any port, while an entry with a port, such as `mc.example.com:25566`, matches only that port. The server list screen marks invalid addresses in red and does not save until they are fixed or removed.
 

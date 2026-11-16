@@ -58,8 +58,11 @@ public final class TeleportMenu {
 
 		menu.append("\n").append(Component.translatable("teleport.menu.places", ComponentUtils.formatList(placeEntries(player), CommonComponents.SPACE)));
 
-		if (!TeleportClient.controller().isAllowed()) {
-			menu.append("\n").append(TeleportErrors.BLOCKED_MESSAGE.copy().withStyle(ChatFormatting.GRAY));
+		switch (TeleportClient.controller().availability()) {
+			case BLOCKED -> menu.append("\n").append(TeleportErrors.BLOCKED_MESSAGE.copy().withStyle(ChatFormatting.GRAY));
+			case TURNED_OFF -> menu.append("\n").append(TeleportErrors.TURNED_OFF_MESSAGE.copy().withStyle(ChatFormatting.GRAY));
+			case AVAILABLE -> {
+			}
 		}
 		TeleportFeedback.send(player, menu);
 		return 1;

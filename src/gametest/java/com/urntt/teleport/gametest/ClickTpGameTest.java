@@ -4,10 +4,12 @@ import static com.urntt.teleport.gametest.GameTestSupport.LOGGER;
 import static com.urntt.teleport.gametest.GameTestSupport.bindKey;
 import static com.urntt.teleport.gametest.GameTestSupport.check;
 import static com.urntt.teleport.gametest.GameTestSupport.checkClose;
+import static com.urntt.teleport.gametest.GameTestSupport.clearMessages;
 import static com.urntt.teleport.gametest.GameTestSupport.configure;
 import static com.urntt.teleport.gametest.GameTestSupport.listenForMessages;
 import static com.urntt.teleport.gametest.GameTestSupport.loadSavedConfig;
 import static com.urntt.teleport.gametest.GameTestSupport.position;
+import static com.urntt.teleport.gametest.GameTestSupport.requireMessageWith;
 import static com.urntt.teleport.gametest.GameTestSupport.unbindKey;
 
 import com.urntt.teleport.TeleportClient;
@@ -32,9 +34,9 @@ import net.minecraft.world.phys.HitResult;
 import net.minecraft.world.phys.Vec3;
 
 /**
- * Checks Click TP in a singleplayer world: the toggle key, where each clicked face leads, that it replaces the use
- * action, repeating while the key is held, sneaking, the reach, entities under the crosshair, the destination
- * preview, how the server treats a teleport down, and the settings key and screens.
+ * Checks Click TP in a singleplayer world: the toggle key, that it needs the mod to be on, where each clicked face
+ * leads, that it replaces the use action, repeating while the key is held, sneaking, the reach, entities under the
+ * crosshair, the destination preview, how the server treats a teleport down, and the settings key and screens.
  */
 @SuppressWarnings("UnstableApiUsage")
 public final class ClickTpGameTest implements FabricClientGameTest {
@@ -60,6 +62,7 @@ public final class ClickTpGameTest implements FabricClientGameTest {
 					"a new world should start with an empty back history");
 
 			checkToggleKey(context, toggleKey);
+			checkTurnedOff(context, toggleKey, server);
 			checkFaces(context, server);
 			checkRepeat(context);
 			checkSneaking(context, server);
@@ -71,6 +74,7 @@ public final class ClickTpGameTest implements FabricClientGameTest {
 		}
 
 		configure(context, config -> {
+			config.setEnabled(true);
 			config.setClickTpEnabled(false);
 			config.setClickTpReach(TeleportConfig.DEFAULT_CLICK_TP_REACH);
 		});
@@ -124,12 +128,34 @@ public final class ClickTpGameTest implements FabricClientGameTest {
 	}
 
 	private static void checkToggleKey(final ClientGameTestContext context, final KeyMapping toggleKey) {
-		check(!isEnabled(context), "Click TP should start off");
+		check(!isClickTpEnabled(context), "Click TP should start off");
 		context.getInput().pressKey(toggleKey);
 		context.waitTick();
-		check(isEnabled(context), "the toggle key should turn Click TP on");
+		check(isClickTpEnabled(context), "the toggle key should turn Click TP on");
 		check(loadSavedConfig().isClickTpEnabled(), "the new state should be saved");
 		context.takeScreenshot("clicktp-toggled-on");
+	}
+
+	/**
+	 * While the whole mod is off, Click TP does nothing even though it is on, and its toggle key only reports why.
+	 */
+	private static void checkTurnedOff(final ClientGameTestContext context, final KeyMapping toggleKey, final TestServerContext server) {
+		configure(context, config -> config.setEnabled(false));
+		BlockPos ground = BlockPos.containing(position(context)).offset(0, -1, 3);
+		Vec3 before = position(context);
+		clearMessages(context);
+		clickTop(context, ground);
+		context.waitTicks(2);
+		check(position(context).distanceTo(before) < STANDING, "Click TP should not teleport while the mod is off");
+		context.waitFor(client -> client.level.getBlockState(ground.above()).is(Blocks.STONE), 40);
+
+		context.getInput().pressKey(toggleKey);
+		context.waitTick();
+		check(isClickTpEnabled(context), "the Click TP key should not change Click TP while the mod is off");
+		requireMessageWith(context, "message.teleport.turned_off");
+
+		fill(context, server, ground.above(), ground.above(), "minecraft:air");
+		configure(context, config -> config.setEnabled(true));
 	}
 
 	/**
@@ -301,7 +327,7 @@ public final class ClickTpGameTest implements FabricClientGameTest {
 		context.waitFor(client -> client.level.getBlockState(to).isAir() == air);
 	}
 
-	private static boolean isEnabled(final ClientGameTestContext context) {
+	private static boolean isClickTpEnabled(final ClientGameTestContext context) {
 		return context.computeOnClient(client -> TeleportClient.config().isClickTpEnabled());
 	}
 

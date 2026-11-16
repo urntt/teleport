@@ -38,6 +38,9 @@ public final class TeleportConfigScreen extends OptionsSubScreen {
 		}
 		TeleportConfig config = TeleportClient.config();
 
+		this.list.addHeader(Component.translatable("options.teleport.section.current"));
+		this.list.addBig(toggle(TeleportClient.FEATURE_NAME_KEY, config.isEnabled(), config::setEnabled));
+
 		this.list.addHeader(Component.translatable("options.teleport.section.click_tp"));
 		this.list.addBig(toggle(TeleportClient.CLICK_TP_NAME_KEY, config.isClickTpEnabled(), config::setClickTpEnabled));
 		StringWidget reachLabel = new StringWidget(HALF_WIDTH, ROW_HEIGHT, REACH, this.font);

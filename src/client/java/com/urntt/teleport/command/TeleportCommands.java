@@ -161,14 +161,17 @@ public final class TeleportCommands {
 
 	/**
 	 * Makes {@code builder} teleport to the destination {@code resolver} finds, and adds a {@code get} child that only
-	 * prints it. Teleporting checks the multiplayer rules first; {@code get} works everywhere.
+	 * prints it. Teleporting first checks the multiplayer rules and whether the mod is on; {@code get} works everywhere.
 	 */
 	private static <T extends ArgumentBuilder<ClientSuggestionProvider, T>> T destination(final T builder, final Resolver resolver) {
 		return builder
 				.executes(c -> {
 					LocalPlayer player = player();
-					if (!TeleportClient.controller().isAllowed()) {
-						throw TeleportErrors.BLOCKED.create();
+					switch (TeleportClient.controller().availability()) {
+						case BLOCKED -> throw TeleportErrors.BLOCKED.create();
+						case TURNED_OFF -> throw TeleportErrors.TURNED_OFF.create();
+						case AVAILABLE -> {
+						}
 					}
 					return teleport(player, resolver.resolve(c, player));
 				})

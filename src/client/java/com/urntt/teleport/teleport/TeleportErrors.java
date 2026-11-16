@@ -11,6 +11,9 @@ public final class TeleportErrors {
 	/** Teleporting is ruled out by the multiplayer mode. Also shown on the action bar by the Click TP key. */
 	public static final Component BLOCKED_MESSAGE = Component.translatable("message.teleport.blocked");
 	public static final SimpleCommandExceptionType BLOCKED = new SimpleCommandExceptionType(BLOCKED_MESSAGE);
+	/** The player turned the whole mod off. Also shown on the action bar by the Click TP key. */
+	public static final Component TURNED_OFF_MESSAGE = Component.translatable("message.teleport.turned_off");
+	public static final SimpleCommandExceptionType TURNED_OFF = new SimpleCommandExceptionType(TURNED_OFF_MESSAGE);
 	/** Same message as vanilla {@code /tp} outside the world bounds. */
 	public static final SimpleCommandExceptionType INVALID_POSITION =
 			new SimpleCommandExceptionType(Component.translatable("commands.teleport.invalidPosition"));

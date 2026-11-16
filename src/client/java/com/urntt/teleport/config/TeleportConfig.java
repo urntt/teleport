@@ -2,7 +2,10 @@ package com.urntt.teleport.config;
 
 import com.google.gson.Gson;
 import com.google.gson.GsonBuilder;
+import com.google.gson.JsonElement;
+import com.google.gson.JsonObject;
 import com.google.gson.JsonParseException;
+import com.google.gson.JsonParser;
 import com.urntt.teleport.TeleportClient;
 import java.io.IOException;
 import java.nio.file.Files;
@@ -57,7 +60,11 @@ public final class TeleportConfig {
 
 		Settings settings;
 		try {
-			settings = GSON.fromJson(Files.readString(path), Settings.class);
+			JsonElement json = JsonParser.parseString(Files.readString(path));
+			if (json.isJsonObject()) {
+				migrateFrom100(json.getAsJsonObject());
+			}
+			settings = GSON.fromJson(json, Settings.class);
 		} catch (IOException | JsonParseException e) {
 			LOGGER.warn("Failed to read config file {}, using defaults", path, e);
 			return new TeleportConfig(path, new Settings());
@@ -72,7 +79,29 @@ public final class TeleportConfig {
 		return config;
 	}
 
-	/** The current state of Click TP, as toggled by the key binding. */
+	/**
+	 * Version 1.0.0 had no state for the whole mod, and its {@code singleplayerDefault} and {@code multiplayerDefault}
+	 * were defaults of Click TP. A file without {@code enabled} comes from that version, so those two values are
+	 * dropped and the defaults for the whole mod apply instead.
+	 */
+	private static void migrateFrom100(final JsonObject json) {
+		if (!json.has("enabled")) {
+			json.remove("singleplayerDefault");
+			json.remove("multiplayerDefault");
+		}
+	}
+
+	/** The current state of the whole mod, as toggled by its key binding. */
+	public boolean isEnabled() {
+		return this.settings.enabled;
+	}
+
+	public void setEnabled(final boolean enabled) {
+		this.settings.enabled = enabled;
+		this.save();
+	}
+
+	/** The current state of Click TP, as toggled by its key binding. */
 	public boolean isClickTpEnabled() {
 		return this.settings.clickTp;
 	}
@@ -105,7 +134,7 @@ public final class TeleportConfig {
 		this.save();
 	}
 
-	/** The Click TP state a reset restores in singleplayer worlds. */
+	/** The state of the whole mod a reset restores in singleplayer worlds. */
 	public boolean singleplayerDefault() {
 		return this.settings.singleplayerDefault;
 	}
@@ -115,7 +144,7 @@ public final class TeleportConfig {
 		this.save();
 	}
 
-	/** The Click TP state a reset restores on multiplayer servers that the multiplayer mode allows. */
+	/** The state of the whole mod a reset restores on multiplayer servers that the multiplayer mode allows. */
 	public boolean multiplayerDefault() {
 		return this.settings.multiplayerDefault;
 	}
@@ -125,7 +154,7 @@ public final class TeleportConfig {
 		this.save();
 	}
 
-	/** Whether every world starts with Click TP in its default state. */
+	/** Whether every world starts with the mod in its default state. */
 	public boolean resetOnWorldExit() {
 		return this.settings.resetOnWorldExit;
 	}
@@ -135,7 +164,7 @@ public final class TeleportConfig {
 		this.save();
 	}
 
-	/** Whether the first world after starting the game starts with Click TP in its default state. */
+	/** Whether the first world after starting the game starts with the mod in its default state. */
 	public boolean resetOnGameExit() {
 		return this.settings.resetOnGameExit;
 	}
@@ -182,11 +211,12 @@ public final class TeleportConfig {
 	 * The serialized form. Field initializers are the defaults, which also apply to keys missing from the file.
 	 */
 	private static final class Settings {
+		private boolean enabled = true;
 		private boolean clickTp = false;
 		private int clickTpReach = DEFAULT_CLICK_TP_REACH;
 		private boolean clickTpPreview = true;
-		private boolean singleplayerDefault = false;
-		private boolean multiplayerDefault = false;
+		private boolean singleplayerDefault = true;
+		private boolean multiplayerDefault = true;
 		private boolean resetOnWorldExit = false;
 		private boolean resetOnGameExit = false;
 		private MultiplayerMode multiplayerMode = MultiplayerMode.DISABLED;
