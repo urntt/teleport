@@ -6,6 +6,8 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 
 ## [Unreleased]
 
+## [1.1.0+26.3] - 2026-11-16
+
 ### Added
 
 - Add a state for the whole mod, on by default, with a **Toggle teleport** key binding (unbound by default) and a setting on the configuration screen. While it is off, `/tp @c` and Click TP do not move the player; `get`, the menu, `sethome` and `settemp` keep working.
