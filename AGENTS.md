@@ -76,6 +76,9 @@ The mod version itself follows [Semantic Versioning](https://semver.org/); the `
 - Language: Java only.
 - Source sets: `src/main` holds only `fabric.mod.json`. All code and client resources live in `src/client`, and the client game tests live in `src/gametest`.
 - Mixins: prefer the MixinExtras injectors bundled with Fabric Loader (for example `@ModifyExpressionValue` and `@WrapOperation`) over `@Redirect` and `@Overwrite`, to stay compatible with other mods and keep porting work small.
+- Commands reach the server through two `ClientPacketListener` methods: `sendCommand` for typed commands and `sendUnattendedCommand` for chat click events. Both must be intercepted.
+- Fabric's `ClientPlayConnectionEvents.DISCONNECT` does not fire reliably when a singleplayer world is closed, so per-world state is also reset on `JOIN`.
+- Vanilla treats a client teleport as ordinary movement: the server adds every block moved down to the fall distance, even when the player lands on a block. The client game tests measure this, and `README.md` warns about it; do not try to avoid it.
 
 ### Testing
 

@@ -1,0 +1,21 @@
+{
+	"required": true,
+	"package": "com.urntt.teleport.mixin",
+	"compatibilityLevel": "JAVA_${java_version}",
+	"client": [
+		"AzimuthWaypointAccessor",
+		"ChunkWaypointAccessor",
+		"ClientPacketListenerMixin",
+		"EntitySelectorAccessor",
+		"LevelExtractorAccessor",
+		"LevelExtractorMixin",
+		"MinecraftMixin",
+		"Vec3iWaypointAccessor"
+	],
+	"injectors": {
+		"defaultRequire": 1
+	},
+	"overwrites": {
+		"requireAnnotations": true
+	}
+}

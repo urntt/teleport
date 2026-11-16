@@ -1,0 +1,40 @@
+{
+	"schemaVersion": 1,
+	"id": "teleport",
+	"version": "${version}",
+	"name": "teleport",
+	"description": "Teleports the local player on the client without asking the server.",
+	"authors": [
+		"urntt"
+	],
+	"contact": {
+		"homepage": "https://github.com/urntt/teleport",
+		"sources": "https://github.com/urntt/teleport",
+		"issues": "https://github.com/urntt/teleport/issues"
+	},
+	"license": "MIT",
+	"environment": "client",
+	"entrypoints": {
+		"client": [
+			"com.urntt.teleport.TeleportClient"
+		],
+		"modmenu": [
+			"com.urntt.teleport.compat.ModMenuIntegration"
+		]
+	},
+	"mixins": [
+		{
+			"config": "teleport.client.mixins.json",
+			"environment": "client"
+		}
+	],
+	"depends": {
+		"fabricloader": ">=${loader_version}",
+		"minecraft": "~${minecraft_version}",
+		"java": ">=${java_version}",
+		"fabric-api": ">=${fabric_api_version}"
+	},
+	"suggests": {
+		"modmenu": "*"
+	}
+}

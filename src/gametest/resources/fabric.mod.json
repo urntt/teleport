@@ -1,0 +1,18 @@
+{
+	"schemaVersion": 1,
+	"id": "teleport-gametest",
+	"version": "0.0.0",
+	"name": "teleport game tests",
+	"environment": "client",
+	"entrypoints": {
+		"fabric-client-gametest": [
+			"com.urntt.teleport.gametest.TeleportLogicGameTest",
+			"com.urntt.teleport.gametest.TeleportCommandGameTest",
+			"com.urntt.teleport.gametest.ClickTpGameTest",
+			"com.urntt.teleport.gametest.TeleportMultiplayerGameTest"
+		]
+	},
+	"depends": {
+		"teleport": "*"
+	}
+}
