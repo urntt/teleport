@@ -29,11 +29,9 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.Locale;
 import java.util.Objects;
-import java.util.Optional;
 import java.util.concurrent.CompletableFuture;
 import java.util.function.Predicate;
 import java.util.regex.Pattern;
-import java.util.stream.Stream;
 import net.fabricmc.fabric.api.client.gametest.v1.FabricClientGameTest;
 import net.fabricmc.fabric.api.client.gametest.v1.context.ClientGameTestContext;
 import net.fabricmc.fabric.api.client.gametest.v1.context.TestSingleplayerContext;
@@ -64,6 +62,8 @@ public final class ConfigScreenGameTest implements FabricClientGameTest {
 	/** A custom multiplayer mode that differs from the default, to show which settings apply in each mode. */
 	private static final MultiplayerMode CUSTOM_MULTIPLAYER_MODE = MultiplayerMode.WHITELIST;
 	private static final Pattern ONECONFIG_CLICK_TP_ON = Pattern.compile("\"clickTp\"\\s*:\\s*true");
+	/** How long OneConfig gets to save its file after a change. */
+	private static final int ONECONFIG_SAVE_TICKS = 100;
 
 	@Override
 	public void runTest(final ClientGameTestContext context) {
@@ -239,7 +239,7 @@ public final class ConfigScreenGameTest implements FabricClientGameTest {
 				context.waitTick();
 				check(context.computeOnClient(client -> TeleportClient.settings().clickTp()), "the Click TP key should turn Click TP on in OneConfig");
 				check(!loadSavedConfig().clickTp(), "the Click TP key should leave the mod's own Click TP alone in OneConfig mode");
-				String saved = readOneConfigFile();
+				String saved = waitForOneConfigFile(context, contents -> ONECONFIG_CLICK_TP_ON.matcher(contents).find());
 				check(ONECONFIG_CLICK_TP_ON.matcher(saved).find(), "OneConfig should save Click TP, saved " + saved);
 				context.getInput().pressKey(clickTpKey);
 				context.waitTick();
@@ -266,15 +266,28 @@ public final class ConfigScreenGameTest implements FabricClientGameTest {
 		});
 	}
 
-	/** Reads OneConfig's file for this mod, wherever OneConfig keeps it under the game directory. */
-	private static String readOneConfigFile() {
-		Path gameDir = FabricLoader.getInstance().getGameDir();
-		String name = TeleportClient.MOD_ID + "-oneconfig.json";
-		try (Stream<Path> files = Files.walk(gameDir)) {
-			Optional<Path> file = files.filter(path -> path.getFileName().toString().equals(name)).findFirst();
-			check(file.isPresent(), "OneConfig should keep " + name + " under " + gameDir);
-			LOGGER.info("OneConfig keeps this mod's settings in {}", gameDir.relativize(file.get()));
-			return Files.readString(file.get());
+	/**
+	 * Waits up to {@link #ONECONFIG_SAVE_TICKS} ticks until OneConfig's file for this mod matches {@code saved}, and
+	 * returns its contents then, or at the end of the wait. OneConfig saves it in the config directory, on a thread of
+	 * its own; its backups elsewhere in the game directory have the same name and may be older.
+	 */
+	private static String waitForOneConfigFile(final ClientGameTestContext context, final Predicate<String> saved) {
+		Path file = FabricLoader.getInstance().getConfigDir().resolve(TeleportClient.MOD_ID + "-oneconfig.json");
+		String contents = "";
+		for (int tick = 0; tick < ONECONFIG_SAVE_TICKS; tick++) {
+			contents = readIfPresent(file);
+			if (saved.test(contents)) {
+				break;
+			}
+			context.waitTick();
+		}
+		LOGGER.info("OneConfig's file {} holds {}", file, contents);
+		return contents;
+	}
+
+	private static String readIfPresent(final Path file) {
+		try {
+			return Files.exists(file) ? Files.readString(file) : "";
 		} catch (IOException e) {
 			throw new UncheckedIOException(e);
 		}
