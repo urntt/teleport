@@ -1,0 +1,55 @@
+<svg width="1024" height="1024" viewBox="0 0 1024 1024" xmlns="http://www.w3.org/2000/svg">
+  <rect width="1024" height="1024" fill="none"/>
+  <g transform="translate(0 50)">
+    <!-- hair clip: unchanged -->
+    <g transform="translate(600 120) rotate(20 130 58) scale(1.5)">
+    <path d="M28 57
+             C28 49, 28 42, 29 36
+             C31 27, 39 23, 48 27
+             C67 35, 89 43, 105 50
+             C115 54, 115 58, 105 62
+             C89 69, 67 78, 48 86
+             C39 90, 31 86, 29 77
+             C28 70, 28 64, 28 57
+             Z"
+          fill="#ff4fa0"/>
+    <path d="M104 16 L104 69
+             C104 108, 156 108, 156 69
+             L156 16"
+          fill="none"
+          stroke="#ff4fa0"
+          stroke-width="22"
+          stroke-linecap="round"
+          stroke-linejoin="round"/>
+    <path d="M232 57
+             C232 49, 232 42, 231 36
+             C229 27, 221 23, 212 27
+             C193 35, 171 43, 155 50
+             C145 54, 145 58, 155 62
+             C171 69, 193 78, 212 86
+             C221 90, 229 86, 231 77
+             C232 70, 232 64, 232 57
+             Z"
+          fill="#ff4fa0"/>
+    </g>
+
+    <!-- location pin: the destination -->
+    <path d="M590 745
+             L473 567
+             A140 140 0 1 1 707 567
+             Z"
+          fill="none"
+          stroke="#ff4fa0"
+          stroke-width="50"
+          stroke-linecap="round"
+          stroke-linejoin="round"/>
+    <circle cx="590" cy="490" r="48" fill="#ff4fa0"/>
+
+    <!-- motion lines: the jump there -->
+    <g fill="none" stroke="#ff4fa0" stroke-width="50" stroke-linecap="round">
+      <path d="M300 420 H370"/>
+      <path d="M240 510 H370"/>
+      <path d="M300 600 H370"/>
+    </g>
+  </g>
+</svg>

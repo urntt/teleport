@@ -13,6 +13,7 @@
 		"issues": "https://github.com/urntt/teleport/issues"
 	},
 	"license": "MIT",
+	"icon": "assets/teleport/icon.png",
 	"environment": "client",
 	"entrypoints": {
 		"client": [
@@ -20,6 +21,9 @@
 		],
 		"modmenu": [
 			"com.urntt.teleport.compat.ModMenuIntegration"
+		],
+		"oneconfig:config": [
+			"com.urntt.teleport.compat.oneconfig.OneConfigIntegration"
 		]
 	},
 	"mixins": [
@@ -35,6 +39,7 @@
 		"fabric-api": ">=${fabric_api_version}"
 	},
 	"suggests": {
-		"modmenu": "*"
+		"modmenu": "*",
+		"oneconfig": "*"
 	}
 }

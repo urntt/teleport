@@ -6,7 +6,7 @@ Instructions for AI coding agents working in this repository. `CLAUDE.md` import
 
 `teleport` is a client-side [Fabric](https://fabricmc.net/) mod for Minecraft: Java Edition that lets the player teleport without asking the server: `/tp @c …` and `/teleport @c …` change only the local player's position, whatever the player's permissions are. It also offers Click TP (teleport to the block you right-click) and quick destinations such as `back`, `home`, `spawn` and `worldspawn`.
 
-[urntt/nojumpdelay](https://github.com/urntt/nojumpdelay) is the reference for the configuration screen, the configuration options, the multiplayer rules and the overall project layout. [urntt/litematica-creator](https://github.com/urntt/litematica-creator) shows how to render a translucent copy of the local player on Minecraft 26.3. [urntt/nomovementcheck](https://github.com/urntt/nomovementcheck) is a separate server-side mod that makes a server accept client teleports for trusted players; this mod only recommends it and never depends on it.
+[urntt/gamemode](https://github.com/urntt/gamemode) is the reference for the configuration: the configuration modes, the configuration screen, the optional OneConfig integration and the icon. [urntt/nojumpdelay](https://github.com/urntt/nojumpdelay) is the reference for the multiplayer rules and the overall project layout. [urntt/litematica-creator](https://github.com/urntt/litematica-creator) shows how to render a translucent copy of the local player on Minecraft 26.3. [urntt/nomovementcheck](https://github.com/urntt/nomovementcheck) is a separate server-side mod that makes a server accept client teleports for trusted players; this mod only recommends it and never depends on it.
 
 ## Project decisions
 
@@ -14,7 +14,7 @@ These decisions are settled. Do not deviate from them without the user's explici
 
 ### Minecraft and toolchain
 
-- Development started on Minecraft 26.3 with Java 25. `gradle.properties` is the single source of truth for the mod, Minecraft, Fabric Loader, Loom, Fabric API, Mod Menu, and Java versions. `build.gradle`, `fabric.mod.json`, the mixin config, and the CI workflows read them from there; do not restate them elsewhere.
+- Development started on Minecraft 26.3 with Java 25. `gradle.properties` is the single source of truth for the mod, Minecraft, Fabric Loader, Loom, Fabric API, Mod Menu, OneConfig, and Java versions, including the Modrinth version ids of the OneConfig runtime. `build.gradle`, `fabric.mod.json`, the mixin config, and the CI workflows read them from there; do not restate them elsewhere.
 - Follow the latest official Fabric template ([FabricMC/fabric-example-mod](https://github.com/FabricMC/fabric-example-mod), also available from the [template generator](https://fabricmc.net/develop/template/)): the `net.fabricmc.fabric-loom` Gradle plugin, Mojang's official names with no `mappings` dependency, and `implementation` (not `modImplementation`) for dependencies. Do not use Yarn.
 - Pin `loom_version` to a release version instead of the template's `-SNAPSHOT`, so builds are reproducible.
 - Target only the latest stable (release) Minecraft version. Updates, fixes, and new features are always developed against it. Snapshots, pre-releases, and release candidates are not supported targets.
@@ -37,7 +37,7 @@ The mod version itself follows [Semantic Versioning](https://semver.org/); the `
 
 - Releases are published only as GitHub Releases. Do not publish to Modrinth, CurseForge, or any other mod platform, and do not add publishing tooling for them.
 - `README.md` must clearly warn about the risks:
-  - Multiplayer: client teleports may conflict with server anti-cheat systems, and using the mod in multiplayer may get the player set back, kicked, or banned. The mod does not try to bypass any anti-cheat, and it is disabled in multiplayer until the player enables it on the configuration screen.
+  - Multiplayer: client teleports may conflict with server anti-cheat systems, and using the mod in multiplayer may get the player set back, kicked, or banned. The mod does not try to bypass any anti-cheat. It is disabled in multiplayer until the player enables it in the settings: in Custom mode through the multiplayer mode, and in OneConfig mode, where the mod is off everywhere until the player turns it on and then works on every server.
   - Singleplayer: the integrated server still validates movement and may move the player back; a teleport can drop the player into the void, lava or a fall, which can end a Hardcore world.
 - `README.md` recommends [urntt/nomovementcheck](https://github.com/urntt/nomovementcheck) for servers the player controls.
 
@@ -53,13 +53,18 @@ The mod version itself follows [Semantic Versioning](https://semver.org/); the `
 - Command syntax after `@c`: everything vanilla `/tp <targets> …` accepts (location, rotation, `facing`, entity destination), plus `back [client|server|death]`, `spawn`, `worldspawn`, `home`, `temp`, `sethome`, `settemp` and `entities`. Every destination form accepts a trailing `get`, which prints the resolved destination instead of teleporting. `/tp @c` alone prints a menu of clickable destinations.
 - Entity destinations are evaluated on the client against loaded entities. Players or UUIDs the client has not loaded fall back to the spectator teleport (while a spectator), then to an exact locator bar waypoint, and otherwise fail with whatever the locator bar knows.
 - Click TP teleports the player to the block they right-click, within a configurable reach (0 to 32767 blocks, 64 by default). It is off by default, needs the mod to be on, is temporarily off while sneaking, repeats while the use key is held, and shows a translucent copy of the player at the destination. It never checks whether the player fits at the destination.
-- `TeleportController` is the single owner of whether teleporting is possible in the current scene and whether Click TP is active, following nojumpdelay's `JumpDelayController`:
-  - The whole mod has a state (on by default), a singleplayer default and a server default (both on by default), and the reset rules "reset on world exit" and "reset on game exit" (both off by default). Resets apply to the mod's state, not to Click TP.
-  - The multiplayer mode is a hard limit: `DISABLED` (the default) rules out every server, `WHITELIST` allows only servers in the server list, and `BLACKLIST` allows every server except those in it. Joining another player's LAN world or a Realm counts as multiplayer. Server list entries match like nojumpdelay's.
-  - `availability()` is `BLOCKED` on a ruled-out scene (checked first), `TURNED_OFF` while the mod is off, and otherwise `AVAILABLE`. Commands that would move the player only report the reason unless it is `AVAILABLE`; `get`, the menu, `sethome` and `settemp` do not move the player and work everywhere.
-  - Click TP is active only when `AVAILABLE` and its own state (off by default) is on.
-  - A configuration file without `enabled` comes from 1.0.0, where the defaults belonged to Click TP; loading it drops those two defaults.
-- Key bindings, all unbound by default: toggle the mod, toggle Click TP (both show the new state or the reason on the action bar and save it) and open the configuration screen. The configuration screen also opens through Mod Menu.
+- Configuration mode, shown as the first button of the configuration screen, as in gamemode:
+  - Disabled: the mod is turned off everywhere.
+  - Custom: the mod's own settings apply: Click TP (off by default), the Click TP reach (64 by default), the destination preview (on by default), the multiplayer mode (`DISABLED` by default) and the server list (empty by default).
+  - OneConfig: the settings registered with OneConfig apply. OneConfig manages the mod's on/off state, the toggle on its card, which is off by default, and the Click TP settings, with the custom defaults. It has no multiplayer mode or server list: once the toggle is on, the mod teleports in singleplayer and on every server, and OneConfig's profiles, each with its own values, take the place of server lists. The mod's own screen shows the Click TP settings greyed out with the values OneConfig applies, without the multiplayer section, next to an "Open in OneConfig" button. This mode is only offered when OneConfig is installed.
+  - The mode is stored only once the player picks one with the mode button. Until then, OneConfig mode applies while OneConfig is installed and Custom mode otherwise. If the configuration file selects OneConfig mode but OneConfig is missing, the mod behaves as in Custom mode and keeps the saved mode until the player changes it.
+  - There is no separate on/off state, toggle key, default or reset rule: Disabled mode turns the mod off. A configuration file from 1.1.0, which had them, keeps its other settings and starts in Disabled mode if its state was off; otherwise it has no chosen mode. Files from 1.0.0 have no chosen mode either.
+  - The settings are listed once in `TeleportSettings`, implemented by `TeleportConfig`, the OneConfig config and the constant `SettingValues` sets (`DEFAULTS`, `ONECONFIG_DEFAULTS`, `DISABLED`). `TeleportConfig.effective()` returns the settings of the effective mode.
+- `TeleportController` is the single owner of whether teleporting is possible in the current scene and whether Click TP is active, following gamemode's `GameModeController`. It reads the settings that apply in the configuration mode through a supplier, so the logic game test can give it any settings:
+  - Settings without multiplayer rules (OneConfig's) allow every scene. Otherwise the multiplayer mode is a hard limit: `DISABLED` (the default) rules out every server, `WHITELIST` allows only servers in the server list, and `BLACKLIST` allows every server except those in it. Joining another player's LAN world or a Realm counts as multiplayer. Server list entries match like nojumpdelay's.
+  - `availability()` is `TURNED_OFF` while the mod is turned off (checked first), `BLOCKED` on a ruled-out scene, and otherwise `AVAILABLE`. Commands that would move the player only report the reason unless it is `AVAILABLE`; `get`, the menu, `sethome` and `settemp` do not move the player and work everywhere.
+  - Click TP is active only when `AVAILABLE` and Click TP in the effective settings is on.
+- Key bindings, all unbound by default: toggle Click TP (in the effective settings, so in OneConfig while in OneConfig mode; it shows the new state or the reason on the action bar and saves it) and open the configuration screen. The configuration screen also opens through Mod Menu and through the "Original menu" link on OneConfig's page.
 
 ### Localization
 
@@ -70,13 +75,19 @@ The mod version itself follows [Semantic Versioning](https://semver.org/); the `
 
 - Required: Fabric Loader and Fabric API.
 - Optional: Mod Menu, declared under `suggests` in `fabric.mod.json`. The mod must load and work normally without it, so Mod Menu classes may only be referenced from the Mod Menu entrypoint.
-- Configuration is hand-written without a config library: JSON files in the Fabric config directory, serialized with Gson (bundled with Minecraft). Any configuration screen uses vanilla widgets.
+- Optional: OneConfig (approved by the user), declared under `suggests` and integrated like gamemode's. The build compiles against its API (`clientCompileOnly`, not bundled), and the mod must load and work normally without it:
+  - OneConfig classes may only be referenced from the `compat.oneconfig` package, which OneConfig reaches through the `oneconfig:config` entrypoint. `compat.OneConfigBridge` connects the rest of the mod to it without referencing OneConfig classes.
+  - OneConfig's annotations need compile-time constants, so translation keys live in `config.SettingKeys`; descriptions use the `.description` suffix and contain no format arguments.
+  - OneConfig keeps its file in the same config directory, so it is named `teleport-oneconfig.json`, not `teleport.json`.
+  - `-PoneConfigRuntime=true` adds OneConfig and its runtime dependencies (Fabric Language Kotlin, PolyCompose) from Modrinth Maven to the development client and the client game tests. Their Modrinth version ids live in `gradle.properties` next to `oneconfig_version`; update them together.
+- The mod's own configuration is hand-written without a config library: JSON files in the Fabric config directory, serialized with Gson (bundled with Minecraft). Its configuration screen uses vanilla widgets.
 - Do not add other dependencies without the user's explicit approval.
 
 ### Implementation
 
 - Language: Java only.
-- Source sets: `src/main` holds only `fabric.mod.json`. All code and client resources live in `src/client`, and the client game tests live in `src/gametest`.
+- Source sets: `src/main` holds only `fabric.mod.json` and the icon. All code and client resources live in `src/client`, and the client game tests live in `src/gametest`.
+- The icon follows gamemode's: the same hair clip, with a location pin and motion lines for the teleport. Its source is `art/icon.svg`. `src/main/resources/assets/teleport/icon.png` is rendered from it at 512 x 512 pixels with a transparent background; render it again whenever the SVG changes.
 - Mixins: prefer the MixinExtras injectors bundled with Fabric Loader (for example `@ModifyExpressionValue` and `@WrapOperation`) over `@Redirect` and `@Overwrite`, to stay compatible with other mods and keep porting work small.
 - Commands reach the server through two `ClientPacketListener` methods: `sendCommand` for typed commands and `sendUnattendedCommand` for chat click events. Both must be intercepted.
 - Fabric's `ClientPlayConnectionEvents.DISCONNECT` does not fire reliably when a singleplayer world is closed, so per-world state is also reset on `JOIN`.
@@ -84,13 +95,14 @@ The mod version itself follows [Semantic Versioning](https://semver.org/); the `
 
 ### Testing
 
-- The client game tests in `src/gametest` start Minecraft and check the commands, the destinations, Click TP, the key bindings, the multiplayer rules on a local dedicated server, and the saved configuration. Keep them passing and extend them when behavior changes.
+- The client game tests in `src/gametest` start Minecraft and check the commands, the destinations, Click TP, the key bindings, the configuration screen and modes, the multiplayer rules on a local dedicated server, the saved configuration, including the upgrade of 1.1.0 files, and the icon. Keep them passing and extend them when behavior changes.
+- Run them twice: without OneConfig, and with `-PoneConfigRuntime=true`, where they also check OneConfig mode.
 - After porting to a new Minecraft version, run the client game tests. A successful build does not prove that the mixins still have the intended effect.
 - `README.md` describes how to run them, including on a headless machine.
 
 ### CI, releases, and changelog
 
-- GitHub Actions (`.github/workflows/build.yml`) builds the project and runs the client game tests on every push and pull request.
+- GitHub Actions (`.github/workflows/build.yml`) builds the project and runs the client game tests on every push and pull request, once without OneConfig and once with it.
 - Maintain `CHANGELOG.md` following [Keep a Changelog](https://keepachangelog.com/). Record every user-visible change under `Unreleased` in the same change that introduces it.
 - `.github/workflows/release.yml` builds the mod and publishes a GitHub Release for the project version, with the jar attached and the matching `CHANGELOG.md` section as release notes. It runs when a tag `v<version>` (for example `v1.0.0+26.3`) is pushed, or when started manually on a branch, in which case it creates that tag on the branch's latest commit. It fails if a pushed tag does not match the project version, if the changelog has no section for the version, or if the release already exists.
 - Release only when the user asks. To release, set `mod_version` in `gradle.properties`, rename `Unreleased` in `CHANGELOG.md` to `[<version>] - <YYYY-MM-DD>` above a new empty `Unreleased` section, commit, and push. Then start the release workflow on `main`. Claude Code cloud sessions cannot push tags, so start the workflow through the GitHub Actions API instead.
@@ -120,6 +132,6 @@ The mod version itself follows [Semantic Versioning](https://semver.org/); the `
   - Email: `urntts@gmail.com`
 - Do all actions on the user's behalf. Do not rewrite existing commit authorship unless explicitly requested. Do not add `Co-Authored-By` trailers or session links to commit messages or pull request descriptions.
 - Develop on `main` and push directly to it. Branches and pull requests are not required.
-- Because changes land on `main` without review, make sure `./gradlew build` and the client game tests pass locally before pushing.
+- Because changes land on `main` without review, make sure `./gradlew build` and both runs of the client game tests pass locally before pushing.
 - If a branch is used, give it a category-based prefix that reflects the purpose of the change, such as `feat/`, `fix/`, `refactor/`, `docs/`, `test/`, or `chore/`.
 - Follow the [Conventional Commits](https://www.conventionalcommits.org/) specification for commit messages.

@@ -13,14 +13,10 @@ import static com.urntt.teleport.gametest.GameTestSupport.requireMessageWith;
 import static com.urntt.teleport.gametest.GameTestSupport.unbindKey;
 
 import com.urntt.teleport.TeleportClient;
-import com.urntt.teleport.config.MultiplayerMode;
-import com.urntt.teleport.config.ServerListScreen;
+import com.urntt.teleport.config.ConfigMode;
 import com.urntt.teleport.config.TeleportConfig;
-import com.urntt.teleport.config.TeleportConfigScreen;
 import com.urntt.teleport.teleport.BackHistory;
-import java.util.List;
 import java.util.Locale;
-import java.util.concurrent.CompletableFuture;
 import net.fabricmc.fabric.api.client.gametest.v1.FabricClientGameTest;
 import net.fabricmc.fabric.api.client.gametest.v1.context.ClientGameTestContext;
 import net.fabricmc.fabric.api.client.gametest.v1.context.TestServerContext;
@@ -36,7 +32,7 @@ import net.minecraft.world.phys.Vec3;
 /**
  * Checks Click TP in a singleplayer world: the toggle key, that it needs the mod to be on, where each clicked face
  * leads, that it replaces the use action, repeating while the key is held, sneaking, the reach, entities under the
- * crosshair, the destination preview, how the server treats a teleport down, and the settings key and screens.
+ * crosshair, the destination preview, and how the server treats a teleport down.
  */
 @SuppressWarnings("UnstableApiUsage")
 public final class ClickTpGameTest implements FabricClientGameTest {
@@ -46,8 +42,9 @@ public final class ClickTpGameTest implements FabricClientGameTest {
 	@Override
 	public void runTest(final ClientGameTestContext context) {
 		listenForMessages(context);
+		// With OneConfig installed and no mode chosen, OneConfig mode applies, where the mod starts turned off.
+		configure(context, config -> config.setMode(ConfigMode.CUSTOM));
 		KeyMapping toggleKey = bindKey(context, TeleportClient.TOGGLE_CLICK_TP_KEY_NAME, "key.keyboard.j");
-		KeyMapping openSettingsKey = bindKey(context, TeleportClient.OPEN_SETTINGS_KEY_NAME, "key.keyboard.k");
 
 		try (TestSingleplayerContext singleplayer = context.worldBuilder().create()) {
 			singleplayer.getConnection().waitForChunksRender();
@@ -70,61 +67,14 @@ public final class ClickTpGameTest implements FabricClientGameTest {
 			checkEntityUnderCrosshair(context, server);
 			checkPreview(context);
 			checkDrop(context, server);
-			checkSettingsScreens(context, openSettingsKey);
 		}
 
 		configure(context, config -> {
-			config.setEnabled(true);
-			config.setClickTpEnabled(false);
+			config.setMode(ConfigMode.CUSTOM);
+			config.setClickTp(false);
 			config.setClickTpReach(TeleportConfig.DEFAULT_CLICK_TP_REACH);
 		});
 		unbindKey(context, toggleKey);
-		unbindKey(context, openSettingsKey);
-	}
-
-	/**
-	 * Opens the settings with the key binding, then takes screenshots of both settings screens in English and in
-	 * Simplified Chinese.
-	 */
-	private static void checkSettingsScreens(final ClientGameTestContext context, final KeyMapping openSettingsKey) {
-		context.getInput().pressKey(openSettingsKey);
-		context.waitForScreen(TeleportConfigScreen.class);
-		context.setScreen(() -> null);
-
-		configure(context, config -> {
-			config.setMultiplayerMode(MultiplayerMode.WHITELIST);
-			config.setServers(List.of("mc.example.com", "192.168.1.5"));
-		});
-		// Keep the cursor away from the widgets so no tooltip covers them.
-		context.getInput().setCursorPos(0, 0);
-		takeSettingsScreenshots(context, "en_us");
-		switchLanguage(context, "zh_cn");
-		takeSettingsScreenshots(context, "zh_cn");
-		switchLanguage(context, "en_us");
-		configure(context, config -> {
-			config.setMultiplayerMode(MultiplayerMode.DISABLED);
-			config.setServers(List.of());
-		});
-	}
-
-	private static void takeSettingsScreenshots(final ClientGameTestContext context, final String language) {
-		context.setScreen(() -> new TeleportConfigScreen(null));
-		context.takeScreenshot("teleport-config-screen-" + language);
-		context.getInput().scroll(-20);
-		context.waitTick();
-		context.takeScreenshot("teleport-config-screen-bottom-" + language);
-		context.setScreen(() -> new ServerListScreen(new TeleportConfigScreen(null), TeleportClient.config()));
-		context.takeScreenshot("teleport-server-list-" + language);
-		context.setScreen(() -> null);
-	}
-
-	private static void switchLanguage(final ClientGameTestContext context, final String language) {
-		CompletableFuture<Void> reload = context.computeOnClient(client -> {
-			client.getLanguageManager().setSelected(language);
-			client.options.languageCode = language;
-			return client.reloadResourcePacks();
-		});
-		context.waitFor(client -> reload.isDone() && client.gui.overlay() == null);
 	}
 
 	private static void checkToggleKey(final ClientGameTestContext context, final KeyMapping toggleKey) {
@@ -132,30 +82,30 @@ public final class ClickTpGameTest implements FabricClientGameTest {
 		context.getInput().pressKey(toggleKey);
 		context.waitTick();
 		check(isClickTpEnabled(context), "the toggle key should turn Click TP on");
-		check(loadSavedConfig().isClickTpEnabled(), "the new state should be saved");
+		check(loadSavedConfig().clickTp(), "the new state should be saved");
 		context.takeScreenshot("clicktp-toggled-on");
 	}
 
 	/**
-	 * While the whole mod is off, Click TP does nothing even though it is on, and its toggle key only reports why.
+	 * In Disabled mode, Click TP does nothing even though it is on, and its toggle key only reports why.
 	 */
 	private static void checkTurnedOff(final ClientGameTestContext context, final KeyMapping toggleKey, final TestServerContext server) {
-		configure(context, config -> config.setEnabled(false));
+		configure(context, config -> config.setMode(ConfigMode.DISABLED));
 		BlockPos ground = BlockPos.containing(position(context)).offset(0, -1, 3);
 		Vec3 before = position(context);
 		clearMessages(context);
 		clickTop(context, ground);
 		context.waitTicks(2);
-		check(position(context).distanceTo(before) < STANDING, "Click TP should not teleport while the mod is off");
+		check(position(context).distanceTo(before) < STANDING, "Click TP should not teleport in Disabled mode");
 		context.waitFor(client -> client.level.getBlockState(ground.above()).is(Blocks.STONE), 40);
 
 		context.getInput().pressKey(toggleKey);
 		context.waitTick();
-		check(isClickTpEnabled(context), "the Click TP key should not change Click TP while the mod is off");
+		check(isClickTpEnabled(context), "the Click TP key should not change Click TP in Disabled mode");
 		requireMessageWith(context, "message.teleport.turned_off");
 
 		fill(context, server, ground.above(), ground.above(), "minecraft:air");
-		configure(context, config -> config.setEnabled(true));
+		configure(context, config -> config.setMode(ConfigMode.CUSTOM));
 	}
 
 	/**
@@ -328,7 +278,7 @@ public final class ClickTpGameTest implements FabricClientGameTest {
 	}
 
 	private static boolean isClickTpEnabled(final ClientGameTestContext context) {
-		return context.computeOnClient(client -> TeleportClient.config().isClickTpEnabled());
+		return context.computeOnClient(client -> TeleportClient.config().clickTp());
 	}
 
 	private static int clientTeleports(final ClientGameTestContext context) {

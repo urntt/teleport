@@ -1,62 +1,55 @@
 package com.urntt.teleport;
 
-import com.urntt.teleport.config.TeleportConfig;
+import com.urntt.teleport.config.MultiplayerRules;
+import com.urntt.teleport.config.TeleportSettings;
+import java.util.function.Consumer;
+import java.util.function.Supplier;
 import org.jspecify.annotations.Nullable;
 
 /**
- * Decides whether the mod may move the player right now and whether Click TP is active, from the configuration and
- * the current {@link Scene}. It is the only place that combines the mod's state, the defaults, the reset rules, the
- * multiplayer rules, and the Click TP state.
+ * Decides whether the mod may move the player right now and whether Click TP is active, from the settings that apply
+ * in the configuration mode and the current {@link Scene}. It is the only place that combines the configuration mode,
+ * the multiplayer rules and the Click TP state.
  */
 public final class TeleportController {
 	/** Whether the mod may move the player in the current scene. */
 	public enum Availability {
 		AVAILABLE,
+		/** The mod is turned off: Disabled mode, or OneConfig's toggle in OneConfig mode. */
+		TURNED_OFF,
 		/** The multiplayer rules rule out the current scene. */
-		BLOCKED,
-		/** The player turned the mod off. */
-		TURNED_OFF
+		BLOCKED
 	}
 
-	/** Outcome of {@link #toggle()} and {@link #toggleClickTp()}. */
+	/** Outcome of {@link #toggleClickTp()}. */
 	public enum ToggleResult {
 		ENABLED,
 		DISABLED,
-		/** The multiplayer rules rule out the current scene, so the state was left unchanged. */
-		BLOCKED,
-		/** The mod is turned off, so the Click TP state was left unchanged. */
-		TURNED_OFF
+		/** The mod is turned off, so Click TP was left unchanged. */
+		TURNED_OFF,
+		/** The multiplayer rules rule out the current scene, so Click TP was left unchanged. */
+		BLOCKED
 	}
 
-	private final TeleportConfig config;
+	private final Supplier<TeleportSettings> settings;
+	private final Consumer<Boolean> clickTpSetter;
 	private Scene scene = Scene.NONE;
-	private boolean allowedWorldJoinedSinceStart = false;
 
-	public TeleportController(final TeleportConfig config) {
-		this.config = config;
+	/**
+	 * @param settings      the settings that apply right now, which change with the configuration mode
+	 * @param clickTpSetter changes and saves Click TP where those settings come from
+	 */
+	public TeleportController(final Supplier<TeleportSettings> settings, final Consumer<Boolean> clickTpSetter) {
+		this.settings = settings;
+		this.clickTpSetter = clickTpSetter;
 	}
 
 	public Scene scene() {
 		return this.scene;
 	}
 
-	/**
-	 * Called when the player joins a world. On an allowed scene, restores the scene's default state of the mod if a
-	 * reset rule applies: always with "reset on world exit", and for the first allowed world since the game started
-	 * with "reset on game exit". Applying the reset on join instead of on exit lets it pick the next scene's default
-	 * and also works after a crash.
-	 */
 	public void onJoin(final Scene scene) {
 		this.scene = scene;
-		if (!this.isAllowed()) {
-			return;
-		}
-
-		boolean firstWorld = !this.allowedWorldJoinedSinceStart;
-		this.allowedWorldJoinedSinceStart = true;
-		if (this.config.resetOnWorldExit() || (this.config.resetOnGameExit() && firstWorld)) {
-			this.config.setEnabled(this.defaultFor(scene));
-		}
 	}
 
 	public void onDisconnect() {
@@ -64,74 +57,67 @@ public final class TeleportController {
 	}
 
 	/**
-	 * Returns whether commands and Click TP may move the player now, and if not, why. The multiplayer rules come
-	 * first, because they apply whatever the mod's state is.
+	 * Returns whether commands and Click TP may move the player now, and if not, why. Being turned off comes first,
+	 * because it applies everywhere.
 	 */
 	public Availability availability() {
-		if (!this.isAllowed()) {
-			return Availability.BLOCKED;
+		TeleportSettings settings = this.settings.get();
+		if (!settings.enabled()) {
+			return Availability.TURNED_OFF;
 		}
-		return this.config.isEnabled() ? Availability.AVAILABLE : Availability.TURNED_OFF;
+		return this.isAllowed(settings) ? Availability.AVAILABLE : Availability.BLOCKED;
 	}
 
 	/**
 	 * Returns whether right-clicking a block teleports the player now.
 	 */
 	public boolean isClickTpActive() {
-		return this.availability() == Availability.AVAILABLE && this.config.isClickTpEnabled();
+		return this.availability() == Availability.AVAILABLE && this.settings.get().clickTp();
 	}
 
 	/**
-	 * Returns whether the multiplayer rules allow moving the player in the current scene.
+	 * Returns whether the multiplayer rules that apply allow moving the player in the current scene.
 	 */
 	public boolean isAllowed() {
-		return switch (this.scene) {
-			case Scene.None none -> false;
-			case Scene.Singleplayer singleplayer -> true;
-			case Scene.Multiplayer multiplayer -> switch (this.config.multiplayerMode()) {
-				case DISABLED -> false;
-				case WHITELIST -> this.isListed(multiplayer.address());
-				case BLACKLIST -> !this.isListed(multiplayer.address());
-			};
-		};
+		return this.isAllowed(this.settings.get());
 	}
 
 	/**
-	 * Flips and saves the state of the whole mod, unless the current server is not allowed.
-	 */
-	public ToggleResult toggle() {
-		if (this.scene instanceof Scene.Multiplayer && !this.isAllowed()) {
-			return ToggleResult.BLOCKED;
-		}
-		boolean enabled = !this.config.isEnabled();
-		this.config.setEnabled(enabled);
-		return enabled ? ToggleResult.ENABLED : ToggleResult.DISABLED;
-	}
-
-	/**
-	 * Flips and saves the Click TP state, unless the mod cannot teleport in the current scene.
+	 * Flips and saves Click TP where the settings that apply come from, unless the mod cannot teleport now.
 	 */
 	public ToggleResult toggleClickTp() {
 		switch (this.availability()) {
-			case BLOCKED -> {
-				return ToggleResult.BLOCKED;
-			}
 			case TURNED_OFF -> {
 				return ToggleResult.TURNED_OFF;
+			}
+			case BLOCKED -> {
+				return ToggleResult.BLOCKED;
 			}
 			case AVAILABLE -> {
 			}
 		}
-		boolean enabled = !this.config.isClickTpEnabled();
-		this.config.setClickTpEnabled(enabled);
+		boolean enabled = !this.settings.get().clickTp();
+		this.clickTpSetter.accept(enabled);
 		return enabled ? ToggleResult.ENABLED : ToggleResult.DISABLED;
 	}
 
-	private boolean defaultFor(final Scene scene) {
-		return scene instanceof Scene.Singleplayer ? this.config.singleplayerDefault() : this.config.multiplayerDefault();
+	/**
+	 * Settings without multiplayer rules, which is OneConfig's, allow every server.
+	 */
+	private boolean isAllowed(final TeleportSettings settings) {
+		MultiplayerRules rules = settings.multiplayerRules();
+		return switch (this.scene) {
+			case Scene.None none -> false;
+			case Scene.Singleplayer singleplayer -> true;
+			case Scene.Multiplayer multiplayer -> rules == null || switch (rules.mode()) {
+				case DISABLED -> false;
+				case WHITELIST -> isListed(rules, multiplayer.address());
+				case BLACKLIST -> !isListed(rules, multiplayer.address());
+			};
+		};
 	}
 
-	private boolean isListed(final @Nullable String address) {
-		return address != null && this.config.servers().stream().anyMatch(entry -> ServerAddresses.matches(entry, address));
+	private static boolean isListed(final MultiplayerRules rules, final @Nullable String address) {
+		return address != null && rules.servers().stream().anyMatch(entry -> ServerAddresses.matches(entry, address));
 	}
 }

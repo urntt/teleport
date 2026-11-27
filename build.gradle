@@ -12,6 +12,24 @@ repositories {
 			includeGroup 'com.terraformersmc'
 		}
 	}
+	maven {
+		name = 'Polyfrost'
+		url = 'https://repo.polyfrost.org/releases/'
+		content {
+			includeGroup 'org.polyfrost.oneconfig'
+		}
+	}
+	exclusiveContent {
+		forRepository {
+			maven {
+				name = 'Modrinth'
+				url = 'https://api.modrinth.com/maven'
+			}
+		}
+		filter {
+			includeGroup 'maven.modrinth'
+		}
+	}
 }
 
 loom {
@@ -45,6 +63,21 @@ dependencies {
 	// Mod Menu is optional: compile against it, and load it only in the development client.
 	clientCompileOnly "com.terraformersmc:modmenu:${project.modmenu_version}"
 	localRuntime "com.terraformersmc:modmenu:${project.modmenu_version}"
+
+	// OneConfig is optional: compile against the parts of its API that the integration uses.
+	// Its many transitive dependencies are only needed at runtime, where OneConfig provides them.
+	["config", "config-impl", "ui"].each { module ->
+		clientCompileOnly("org.polyfrost.oneconfig:${module}:${project.oneconfig_version}") {
+			transitive = false
+		}
+	}
+
+	// With -PoneConfigRuntime=true, the development client and the client game tests run with OneConfig installed.
+	if (providers.gradleProperty("oneConfigRuntime").map { it.toBoolean() }.getOrElse(false)) {
+		localRuntime "maven.modrinth:oneconfig:${project.oneconfig_modrinth_id}"
+		localRuntime "maven.modrinth:fabric-language-kotlin:${project.fabric_language_kotlin_modrinth_id}"
+		localRuntime "maven.modrinth:polycompose:${project.polycompose_modrinth_id}"
+	}
 }
 
 def javaVersion = project.java_version as int

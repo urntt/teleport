@@ -2,7 +2,6 @@ package com.urntt.teleport.gametest;
 
 import static com.urntt.teleport.gametest.GameTestSupport.EPSILON;
 import static com.urntt.teleport.gametest.GameTestSupport.LOGGER;
-import static com.urntt.teleport.gametest.GameTestSupport.bindKey;
 import static com.urntt.teleport.gametest.GameTestSupport.check;
 import static com.urntt.teleport.gametest.GameTestSupport.checkClose;
 import static com.urntt.teleport.gametest.GameTestSupport.clearMessages;
@@ -13,9 +12,11 @@ import static com.urntt.teleport.gametest.GameTestSupport.listenForMessages;
 import static com.urntt.teleport.gametest.GameTestSupport.position;
 import static com.urntt.teleport.gametest.GameTestSupport.requireMessageWith;
 import static com.urntt.teleport.gametest.GameTestSupport.typeCommand;
-import static com.urntt.teleport.gametest.GameTestSupport.unbindKey;
+import static com.urntt.teleport.gametest.GameTestSupport.usesKey;
 
 import com.urntt.teleport.TeleportClient;
+import com.urntt.teleport.TeleportController;
+import com.urntt.teleport.config.ConfigMode;
 import com.urntt.teleport.teleport.BackHistory;
 import com.urntt.teleport.teleport.SavedLocations;
 import java.util.List;
@@ -25,7 +26,6 @@ import net.fabricmc.fabric.api.client.gametest.v1.FabricClientGameTest;
 import net.fabricmc.fabric.api.client.gametest.v1.context.ClientGameTestContext;
 import net.fabricmc.fabric.api.client.gametest.v1.context.TestServerContext;
 import net.fabricmc.fabric.api.client.gametest.v1.context.TestSingleplayerContext;
-import net.minecraft.client.KeyMapping;
 import net.minecraft.client.multiplayer.ClientLevel;
 import net.minecraft.core.BlockPos;
 import net.minecraft.network.chat.Component;
@@ -39,15 +39,15 @@ import net.minecraft.world.phys.Vec3;
 /**
  * Checks {@code /tp @c} in a singleplayer world: every vanilla form against vanilla's own results, entity
  * destinations, {@code get}, the menus and their click events, {@code back}, the saved places, the respawn point,
- * riding, how the integrated server treats client teleports, and turning the mod off, including the reset on world
- * exit.
+ * riding, how the integrated server treats client teleports, and Disabled mode.
  */
 @SuppressWarnings("UnstableApiUsage")
 public final class TeleportCommandGameTest implements FabricClientGameTest {
 	@Override
 	public void runTest(final ClientGameTestContext context) {
 		listenForMessages(context);
-		KeyMapping toggleKey = bindKey(context, TeleportClient.TOGGLE_KEY_NAME, "key.keyboard.j");
+		// With OneConfig installed and no mode chosen, OneConfig mode applies, where the mod starts turned off.
+		configure(context, config -> config.setMode(ConfigMode.CUSTOM));
 		try (TestSingleplayerContext singleplayer = context.worldBuilder().create()) {
 			singleplayer.getConnection().waitForChunksRender();
 			TestServerContext server = singleplayer.getServer();
@@ -66,68 +66,38 @@ public final class TeleportCommandGameTest implements FabricClientGameTest {
 			checkRespawnPoint(context, server);
 			checkRiding(context, server);
 			checkFallDistance(context, server);
-			checkTurnedOff(context, toggleKey);
-
-			// Leave this world turned off to check the reset on world exit below.
-			configure(context, config -> config.setResetOnWorldExit(true));
-			context.getInput().pressKey(toggleKey);
-			context.waitTick();
-			check(!isEnabled(context), "the toggle key should turn the mod off before leaving");
+			checkTurnedOff(context);
 		}
-
-		try (TestSingleplayerContext singleplayer = context.worldBuilder().create()) {
-			singleplayer.getConnection().waitForChunksRender();
-			check(isEnabled(context), "reset on world exit should restore the singleplayer default");
-			configure(context, config -> config.setResetOnWorldExit(false));
-			context.getInput().pressKey(toggleKey);
-			context.waitTick();
-			check(!isEnabled(context), "the toggle key should turn the mod off before leaving");
-		}
-
-		try (TestSingleplayerContext singleplayer = context.worldBuilder().create()) {
-			singleplayer.getConnection().waitForChunksRender();
-			check(!isEnabled(context), "without reset on world exit the state should carry over");
-		}
-
-		configure(context, config -> config.setEnabled(true));
-		unbindKey(context, toggleKey);
 	}
 
 	/**
-	 * The toggle key turns the whole mod off in singleplayer: commands that would move the player only report it,
-	 * nothing is sent to the server, and {@code get} still works.
+	 * In Disabled mode, commands that would move the player only report it, nothing is sent to the server, and
+	 * {@code get} still works.
 	 */
-	private static void checkTurnedOff(final ClientGameTestContext context, final KeyMapping toggleKey) {
-		check(isEnabled(context), "the mod should start on");
-		// Clear the chat so that it does not cover the action bar in the screenshot.
-		context.runOnClient(client -> client.gui.hud.getChat().clearMessages(false));
-		clearMessages(context);
-		context.getInput().pressKey(toggleKey);
-		context.waitTick();
-		check(!isEnabled(context), "the toggle key should turn the mod off");
-		requireMessageWith(context, TeleportClient.FEATURE_NAME_KEY);
-		check(!GameTestSupport.loadSavedConfig().isEnabled(), "the off state should be saved to the config file");
-		context.takeScreenshot("teleport-toggled-off");
+	private static void checkTurnedOff(final ClientGameTestContext context) {
+		configure(context, config -> config.setMode(ConfigMode.DISABLED));
+		check(context.computeOnClient(client -> TeleportClient.controller().availability()) == TeleportController.Availability.TURNED_OFF,
+				"Disabled mode should turn the mod off");
 
 		Vec3 before = position(context);
 		clearMessages(context);
 		typeCommand(context, "tp @c ~3 ~ ~");
 		requireMessageWith(context, "message.teleport.turned_off");
 		context.waitTicks(10);
-		checkClose(position(context), before, EPSILON, "a turned-off mod should not teleport the player");
+		checkClose(position(context), before, EPSILON, "Disabled mode should not teleport the player");
 		check(GameTestSupport.lastMessageWith(context, "command.unknown.command").isEmpty(),
-				"the command should not reach the server while the mod is off");
+				"the command should not reach the server in Disabled mode");
 		typeCommand(context, "tp @c ~ ~ ~3 get");
 		requireMessageWith(context, "teleport.command.get");
+		clearMessages(context);
+		typeCommand(context, "tp @c");
+		check(usesKey(requireMessageWith(context, "teleport.menu.title"), "message.teleport.turned_off"),
+				"the menu should say that the mod is turned off");
+		context.takeScreenshot("teleport-turned-off");
 
-		context.getInput().pressKey(toggleKey);
-		context.waitTick();
-		check(isEnabled(context), "the toggle key should turn the mod on again");
-		check(GameTestSupport.loadSavedConfig().isEnabled(), "the on state should be saved to the config file");
-	}
-
-	private static boolean isEnabled(final ClientGameTestContext context) {
-		return context.computeOnClient(client -> TeleportClient.config().isEnabled());
+		configure(context, config -> config.setMode(ConfigMode.CUSTOM));
+		check(context.computeOnClient(client -> TeleportClient.controller().availability()) == TeleportController.Availability.AVAILABLE,
+				"Custom mode should turn the mod on again");
 	}
 
 	/**

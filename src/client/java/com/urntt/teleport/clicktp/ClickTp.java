@@ -90,7 +90,7 @@ public final class ClickTp {
 		if (minecraft.hitResult != null && minecraft.hitResult.getType() == HitResult.Type.ENTITY) {
 			return false;
 		}
-		Target target = findTarget(player, TeleportClient.config().clickTpReach(), 1.0F);
+		Target target = findTarget(player, TeleportClient.settings().clickTpReach(), 1.0F);
 		if (target == null) {
 			return false;
 		}

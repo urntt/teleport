@@ -15,6 +15,9 @@ import static com.urntt.teleport.gametest.GameTestSupport.unbindKey;
 
 import com.urntt.teleport.Scene;
 import com.urntt.teleport.TeleportClient;
+import com.urntt.teleport.TeleportController;
+import com.urntt.teleport.compat.OneConfigBridge;
+import com.urntt.teleport.config.ConfigMode;
 import com.urntt.teleport.config.MultiplayerMode;
 import com.urntt.teleport.teleport.Waypoints;
 import java.util.List;
@@ -50,7 +53,9 @@ public final class TeleportMultiplayerGameTest implements FabricClientGameTest {
 	public void runTest(final ClientGameTestContext context) {
 		listenForMessages(context);
 		configure(context, config -> {
-			config.setClickTpEnabled(false);
+			// With OneConfig installed and no mode chosen, OneConfig mode applies, which has no multiplayer rules.
+			config.setMode(ConfigMode.CUSTOM);
+			config.setClickTp(false);
 			config.setMultiplayerMode(MultiplayerMode.DISABLED);
 			config.setServers(List.of());
 		});
@@ -72,10 +77,13 @@ public final class TeleportMultiplayerGameTest implements FabricClientGameTest {
 			checkWhitelisted(context, server, connection);
 			checkSpectatorTeleport(context, server);
 			checkLocatorBar(context, server);
+			if (OneConfigBridge.isAvailable()) {
+				checkOneConfigEverywhere(context, server);
+			}
 		}
 
 		configure(context, config -> {
-			config.setClickTpEnabled(false);
+			config.setClickTp(false);
 			config.setMultiplayerMode(MultiplayerMode.DISABLED);
 			config.setServers(List.of());
 		});
@@ -99,7 +107,7 @@ public final class TeleportMultiplayerGameTest implements FabricClientGameTest {
 
 		context.getInput().pressKey(toggleKey);
 		context.waitTick();
-		check(!context.computeOnClient(client -> TeleportClient.config().isClickTpEnabled()), "the toggle key should not turn Click TP on here");
+		check(!context.computeOnClient(client -> TeleportClient.config().clickTp()), "the toggle key should not turn Click TP on here");
 		context.takeScreenshot("teleport-blocked-on-server");
 
 		typeCommand(context, "tp @c ~ ~ ~3 get");
@@ -132,6 +140,54 @@ public final class TeleportMultiplayerGameTest implements FabricClientGameTest {
 		typeCommand(context, "tp @c ~50 ~ ~");
 		context.waitFor(client -> client.player.position().distanceTo(beforeLong) < 0.5, 100);
 		LOGGER.info("The dedicated server set back a 50-block client teleport to {}", position(context));
+	}
+
+	/**
+	 * In OneConfig mode there are no multiplayer rules: the mod is off until OneConfig's toggle is on, and then
+	 * teleports on this server, which no whitelist names.
+	 */
+	private static void checkOneConfigEverywhere(final ClientGameTestContext context, final TestDedicatedServerContext server) {
+		configure(context, config -> {
+			config.setMode(ConfigMode.ONECONFIG);
+			config.setMultiplayerMode(MultiplayerMode.DISABLED);
+			config.setServers(List.of());
+		});
+		Vec3 before = position(context);
+		clearMessages(context);
+		typeCommand(context, "tp @c ~3 ~ ~");
+		requireMessageWith(context, "message.teleport.turned_off");
+		context.waitTicks(10);
+		checkClose(position(context), before, EPSILON, "OneConfig's toggle should be off by default");
+
+		setOneConfigToggle(context, true);
+		Vec3 target = position(context).add(3.0, 0.0, 0.0);
+		typeCommand(context, String.format(Locale.ROOT, "tp @c %.3f %.3f %.3f", target.x, target.y, target.z));
+		context.waitTicks(10);
+		checkClose(position(context), target, EPSILON, "OneConfig mode with its toggle on should teleport on a server no list names");
+		Vec3 onServer = server.computeOnServer(s -> s.getPlayerList().getPlayers().getFirst().position());
+		checkClose(onServer, target, EPSILON, "the server should accept the short client teleport");
+		Scene scene = context.computeOnClient(client -> TeleportClient.controller().scene());
+		LOGGER.info("OneConfig mode with its toggle on teleports on {}", scene);
+
+		setOneConfigToggle(context, false);
+		check(context.computeOnClient(client -> TeleportClient.controller().availability()) == TeleportController.Availability.TURNED_OFF,
+				"turning OneConfig's toggle off should turn the mod off");
+		configure(context, config -> config.setMode(ConfigMode.CUSTOM));
+	}
+
+	/**
+	 * Flips the toggle on the mod's OneConfig card. The tests cannot reference OneConfig's classes, so this sets the
+	 * field of the settings object OneConfig manages.
+	 */
+	private static void setOneConfigToggle(final ClientGameTestContext context, final boolean enabled) {
+		context.runOnClient(client -> {
+			Object settings = OneConfigBridge.settings().orElseThrow();
+			try {
+				settings.getClass().getField("enabled").setBoolean(settings, enabled);
+			} catch (ReflectiveOperationException e) {
+				throw new AssertionError("cannot set OneConfig's toggle", e);
+			}
+		});
 	}
 
 	/**

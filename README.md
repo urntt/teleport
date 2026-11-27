@@ -6,7 +6,7 @@ A client-side Fabric mod for Minecraft: Java Edition that lets the player telepo
 
 ## Warning
 
-**This mod is disabled in multiplayer by default. To use it in multiplayer, change the settings on its configuration screen.**
+**This mod is disabled in multiplayer by default. To use it in multiplayer, change the settings on its configuration screen. In OneConfig mode, the mod is off everywhere until you turn it on, and then works on every server.**
 
 A client teleport is not a server teleport. The mod moves your player on your client, and the movement packets your client sends anyway tell the server about the new position. The server, including the integrated server of a singleplayer world, checks that movement like any other. This mod does not try to bypass any check or anti-cheat.
 
@@ -28,11 +28,14 @@ A client teleport is not a server teleport. The mod moves your player on your cl
 2. Download the jar from this repository's [Releases](https://github.com/urntt/teleport/releases) page. Each release supports a single Minecraft version, shown after the `+` in its version number. For example, `1.0.0+26.3` is for Minecraft 26.3.
 3. Put the jar into your `.minecraft/mods` folder.
 
-[Mod Menu](https://modrinth.com/mod/modmenu) is optional. When installed, it opens the mod's configuration screen from its mod list.
+Optional:
+
+- [Mod Menu](https://modrinth.com/mod/modmenu) opens the mod's configuration screen from its mod list.
+- [OneConfig](https://modrinth.com/mod/oneconfig) can manage the mod instead (see [Settings](#settings)).
 
 ## Usage
 
-The mod is on by default in singleplayer and disabled on multiplayer servers. To turn it off, use the **Toggle teleport** key or the **Teleport** setting. While it is off, commands that would move you only report that teleporting is turned off, and Click TP does nothing. `get`, the menu, `sethome` and `settemp` do not move you and keep working.
+Without OneConfig, the mod is on by default in singleplayer and disabled on multiplayer servers. To turn it off, pick the **Disabled** mode on the configuration screen. While it is off, commands that would move you only report that teleporting is turned off, and Click TP does nothing. `get`, the menu, `sethome` and `settemp` do not move you and keep working.
 
 ### Commands
 
@@ -106,28 +109,36 @@ The destination is not checked, so you can end up inside blocks. Holding the rig
 
 The key bindings are under **teleport** in **Options → Controls → Key Binds** and unbound by default:
 
-- **Toggle teleport** turns the whole mod on or off and shows the new state on the action bar. On a server that the multiplayer settings rule out, it only shows that teleporting is disabled there.
-- **Toggle Click TP** turns Click TP on or off and shows the new state on the action bar. Where teleporting is disabled or turned off, it only shows why.
-- **Open teleport Settings** opens the configuration screen. With Mod Menu installed, you can also open it from the mod list.
+- **Toggle Click TP** turns Click TP on or off and shows the new state on the action bar. In OneConfig mode, it changes the setting in OneConfig. Where teleporting is turned off or disabled, it only shows why.
+- **Open teleport Settings** opens the configuration screen. With Mod Menu installed, you can also open it from the mod list, and with OneConfig, from the mod's OneConfig page.
 
 ### Settings
 
-All settings are saved to `config/teleport.json` as soon as you change them.
+Open the settings screen from Mod Menu, or bind the **Open teleport Settings** key. The button at the top of the screen selects the mode:
+
+| Mode | Effect |
+| --- | --- |
+| Disabled | The mod is turned off everywhere: `/tp @c` and Click TP do not move you. |
+| Custom (default without OneConfig) | The settings on this screen apply. |
+| OneConfig (default with OneConfig) | OneConfig manages the mod. Only offered when OneConfig is installed. |
+
+Until you pick a mode, OneConfig mode applies while OneConfig is installed, and Custom mode otherwise. If you pick OneConfig mode and later remove OneConfig, the custom settings apply until you pick another mode.
+
+In Custom mode, these settings apply:
 
 | Setting | Default | Meaning |
 | --- | --- | --- |
-| Teleport | On | Whether `/tp @c` and Click TP may move you now, the same state the **Toggle teleport** key switches. |
 | Click TP | Off | Whether right-clicking a block teleports you, the same state the **Toggle Click TP** key switches. |
 | Click TP Reach | 64 | How far away, in blocks, Click TP finds the block you look at (0 to 32767). |
 | Destination Preview | On | Shows a translucent copy of you where Click TP would put you. |
-| Singleplayer Default | On | Whether a reset turns the mod on or off in singleplayer worlds, including worlds you open to LAN. |
-| Server Default | On | Whether a reset turns the mod on or off on servers that the multiplayer mode allows. |
-| Reset on World Exit | Off | Every world starts with the mod in its default state instead of keeping the last state. |
-| Reset on Game Exit | Off | After restarting the game, the first world where the mod is allowed starts with the mod in its default state. |
-| Multiplayer mode | Disabled | **Disabled**: never teleports on servers. **Whitelist**: teleports only on servers in the server list. **Blacklist**: teleports on all servers except those in the server list. |
+| Multiplayer Mode | Disabled | **Disabled**: never teleports on servers. **Whitelist**: teleports only on servers in the server list. **Blacklist**: teleports on all servers except those in the server list. |
 | Server List | Empty | The addresses the whitelist and blacklist modes use. |
 
-The multiplayer mode is a hard limit: on a server it rules out, the mod stays off whatever its state is, and every command that would move you only reports that teleporting is disabled there. `get`, the menu, `sethome` and `settemp` do not move you and work everywhere. Joining another player's LAN world or a Realm counts as multiplayer.
+In OneConfig mode, the mod's card in OneConfig turns the mod on and off; it is **off by default**. The mod's page in OneConfig holds **Click TP**, **Click TP Reach** and **Destination Preview**, with the same defaults as above. There is no multiplayer mode or server list: once the card is on, the mod teleports in singleplayer and on **every server**. To use different settings on some servers, keep them in different OneConfig profiles and switch profiles. This screen shows OneConfig's values greyed out and links to them with **Open in OneConfig**.
+
+The custom settings are saved to `config/teleport.json` as soon as you change them; OneConfig keeps its own (`teleport-oneconfig.json`) with each profile. A configuration file from version 1.1.0, which had an on/off state, defaults and reset rules instead of modes, keeps its other settings and starts in Disabled mode if the mod was off.
+
+The multiplayer mode is a hard limit: on a server it rules out, the mod stays off, and every command that would move you only reports that teleporting is disabled there. `get`, the menu, `sethome` and `settemp` do not move you and work everywhere. Joining another player's LAN world or a Realm counts as multiplayer.
 
 Server list entries are compared with the address you connect to, ignoring upper and lower case. An entry without a port, such as `mc.example.com`, matches the server on any port, while an entry with a port, such as `mc.example.com:25566`, matches only that port. The server list screen marks invalid addresses in red and does not save until they are fixed or removed.
 
@@ -143,7 +154,7 @@ Build the mod:
 
 The jar is written to `build/libs/`.
 
-Run the client game tests, which start Minecraft and check the commands against vanilla's own results, the destinations, the menus, Click TP, the key bindings, the settings screens, and the multiplayer rules and destination sources on a local dedicated server:
+Run the client game tests, which start Minecraft and check the commands against vanilla's own results, the destinations, the menus, Click TP, the key bindings, the configuration screen and modes, and the multiplayer rules and destination sources on a local dedicated server:
 
 ```bash
 ./gradlew runClientGameTest
@@ -156,6 +167,12 @@ xvfb-run -a -s "-screen 0 1920x1080x24" ./gradlew runClientGameTest
 ```
 
 Screenshots taken by the tests are saved to `build/run/clientGameTest/screenshots/`.
+
+By default, the development client and the tests run without OneConfig. Add `-PoneConfigRuntime=true` to run them with OneConfig installed, which offers the OneConfig mode. In that run, the tests also check that OneConfig mode is the default and starts turned off, that its settings apply on a server no list names once it is on, that the screen opens OneConfig, and that the **Toggle Click TP** key changes and saves OneConfig's setting:
+
+```bash
+./gradlew runClientGameTest -PoneConfigRuntime=true
+```
 
 The multiplayer tests start a local dedicated server, so the test setup in `build.gradle` accepts the [Minecraft EULA](https://aka.ms/MinecraftEULA) for that test server.
 

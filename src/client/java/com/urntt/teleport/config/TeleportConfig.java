@@ -2,25 +2,25 @@ package com.urntt.teleport.config;
 
 import com.google.gson.Gson;
 import com.google.gson.GsonBuilder;
-import com.google.gson.JsonElement;
-import com.google.gson.JsonObject;
 import com.google.gson.JsonParseException;
-import com.google.gson.JsonParser;
 import com.urntt.teleport.TeleportClient;
+import com.urntt.teleport.compat.OneConfigBridge;
 import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Objects;
 import net.fabricmc.loader.api.FabricLoader;
 import net.minecraft.util.Mth;
+import org.jspecify.annotations.Nullable;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 /**
- * The mod's settings, persisted as JSON. Every change is written to disk immediately.
+ * The configuration mode and the mod's own settings, persisted as JSON. Every change is written to disk immediately.
  */
-public final class TeleportConfig {
+public final class TeleportConfig implements TeleportSettings {
 	/** Shortest Click TP reach, in blocks. */
 	public static final int MIN_CLICK_TP_REACH = 0;
 	/** Longest Click TP reach, in blocks. */
@@ -48,83 +48,106 @@ public final class TeleportConfig {
 
 	/**
 	 * Loads the configuration from {@code path}. A missing file is created with the defaults. A readable file is
-	 * rewritten with any settings it lacks. An unreadable file falls back to the defaults and is left untouched
-	 * until the next change is saved.
+	 * rewritten with any settings it lacks and without those it no longer uses. An unreadable file falls back to the
+	 * defaults and is left untouched until the next change is saved.
 	 */
 	public static TeleportConfig load(final Path path) {
 		if (Files.notExists(path)) {
-			TeleportConfig config = new TeleportConfig(path, new Settings());
+			TeleportConfig config = new TeleportConfig(path, new Settings().normalized());
 			config.save();
 			return config;
 		}
 
 		Settings settings;
 		try {
-			JsonElement json = JsonParser.parseString(Files.readString(path));
-			if (json.isJsonObject()) {
-				migrateFrom100(json.getAsJsonObject());
-			}
-			settings = GSON.fromJson(json, Settings.class);
+			settings = GSON.fromJson(Files.readString(path), Settings.class);
 		} catch (IOException | JsonParseException e) {
 			LOGGER.warn("Failed to read config file {}, using defaults", path, e);
-			return new TeleportConfig(path, new Settings());
+			return new TeleportConfig(path, new Settings().normalized());
 		}
 
-		if (settings == null) {
-			settings = new Settings();
-		}
-		settings.normalize();
-		TeleportConfig config = new TeleportConfig(path, settings);
+		TeleportConfig config = new TeleportConfig(path, (settings != null ? settings : new Settings()).normalized());
 		config.save();
 		return config;
 	}
 
 	/**
-	 * Version 1.0.0 had no state for the whole mod, and its {@code singleplayerDefault} and {@code multiplayerDefault}
-	 * were defaults of Click TP. A file without {@code enabled} comes from that version, so those two values are
-	 * dropped and the defaults for the whole mod apply instead.
+	 * The mode the player chose, which may name OneConfig even while OneConfig is not installed, or {@code null} until
+	 * the player chooses one.
 	 */
-	private static void migrateFrom100(final JsonObject json) {
-		if (!json.has("enabled")) {
-			json.remove("singleplayerDefault");
-			json.remove("multiplayerDefault");
+	public @Nullable ConfigMode storedMode() {
+		return this.settings.mode;
+	}
+
+	/**
+	 * The mode that applies. Until the player chooses one, OneConfig manages the mod while it is available. OneConfig
+	 * mode falls back to the custom settings while OneConfig is not available.
+	 */
+	public ConfigMode effectiveMode() {
+		boolean oneConfig = OneConfigBridge.isAvailable();
+		ConfigMode mode = this.settings.mode;
+		if (mode == null) {
+			return oneConfig ? ConfigMode.ONECONFIG : ConfigMode.CUSTOM;
+		}
+		return mode == ConfigMode.ONECONFIG && !oneConfig ? ConfigMode.CUSTOM : mode;
+	}
+
+	/** The settings that apply in the {@linkplain #effectiveMode() effective mode}. */
+	public TeleportSettings effective() {
+		return switch (this.effectiveMode()) {
+			case DISABLED -> SettingValues.DISABLED;
+			case CUSTOM -> this;
+			case ONECONFIG -> OneConfigBridge.settings().orElse(this);
+		};
+	}
+
+	public void setMode(final ConfigMode mode) {
+		this.settings.mode = mode;
+		this.save();
+	}
+
+	/**
+	 * Changes Click TP where the settings that apply come from, as the Click TP key does: in OneConfig in OneConfig
+	 * mode, and in the mod's own settings otherwise.
+	 */
+	public void setEffectiveClickTp(final boolean clickTp) {
+		if (this.effectiveMode() == ConfigMode.ONECONFIG) {
+			OneConfigBridge.setClickTp(clickTp);
+		} else {
+			this.setClickTp(clickTp);
 		}
 	}
 
-	/** The current state of the whole mod, as toggled by its key binding. */
-	public boolean isEnabled() {
-		return this.settings.enabled;
+	/** The mod's own settings are always enabled; Disabled mode turns the mod off. */
+	@Override
+	public boolean enabled() {
+		return true;
 	}
 
-	public void setEnabled(final boolean enabled) {
-		this.settings.enabled = enabled;
-		this.save();
-	}
-
-	/** The current state of Click TP, as toggled by its key binding. */
-	public boolean isClickTpEnabled() {
+	@Override
+	public boolean clickTp() {
 		return this.settings.clickTp;
 	}
 
-	public void setClickTpEnabled(final boolean enabled) {
-		this.settings.clickTp = enabled;
+	public void setClickTp(final boolean clickTp) {
+		this.settings.clickTp = clickTp;
 		this.save();
 	}
 
-	/** How far Click TP looks for a block, in blocks. */
+	@Override
 	public int clickTpReach() {
 		return this.settings.clickTpReach;
 	}
 
 	/**
-	 * Sets the Click TP reach, clamped to {@link #MIN_CLICK_TP_REACH} and {@link #MAX_CLICK_TP_REACH}.
+	 * Sets the Click TP reach, clamped to the allowed range.
 	 */
 	public void setClickTpReach(final int reach) {
 		this.settings.clickTpReach = clampReach(reach);
 		this.save();
 	}
 
-	/** Whether Click TP shows a translucent copy of the player at the destination. */
+	@Override
 	public boolean clickTpPreview() {
 		return this.settings.clickTpPreview;
 	}
@@ -134,44 +157,9 @@ public final class TeleportConfig {
 		this.save();
 	}
 
-	/** The state of the whole mod a reset restores in singleplayer worlds. */
-	public boolean singleplayerDefault() {
-		return this.settings.singleplayerDefault;
-	}
-
-	public void setSingleplayerDefault(final boolean singleplayerDefault) {
-		this.settings.singleplayerDefault = singleplayerDefault;
-		this.save();
-	}
-
-	/** The state of the whole mod a reset restores on multiplayer servers that the multiplayer mode allows. */
-	public boolean multiplayerDefault() {
-		return this.settings.multiplayerDefault;
-	}
-
-	public void setMultiplayerDefault(final boolean multiplayerDefault) {
-		this.settings.multiplayerDefault = multiplayerDefault;
-		this.save();
-	}
-
-	/** Whether every world starts with the mod in its default state. */
-	public boolean resetOnWorldExit() {
-		return this.settings.resetOnWorldExit;
-	}
-
-	public void setResetOnWorldExit(final boolean resetOnWorldExit) {
-		this.settings.resetOnWorldExit = resetOnWorldExit;
-		this.save();
-	}
-
-	/** Whether the first world after starting the game starts with the mod in its default state. */
-	public boolean resetOnGameExit() {
-		return this.settings.resetOnGameExit;
-	}
-
-	public void setResetOnGameExit(final boolean resetOnGameExit) {
-		this.settings.resetOnGameExit = resetOnGameExit;
-		this.save();
+	@Override
+	public MultiplayerRules multiplayerRules() {
+		return new MultiplayerRules(this.settings.multiplayerMode, this.settings.servers);
 	}
 
 	public MultiplayerMode multiplayerMode() {
@@ -189,12 +177,12 @@ public final class TeleportConfig {
 	}
 
 	public void setServers(final List<String> servers) {
-		this.settings.servers = new ArrayList<>(servers);
-		this.settings.normalize();
+		this.settings.servers = normalizedServers(servers);
 		this.save();
 	}
 
-	private static int clampReach(final int reach) {
+	/** Clamps a Click TP reach to the allowed range. */
+	public static int clampReach(final int reach) {
 		return Mth.clamp(reach, MIN_CLICK_TP_REACH, MAX_CLICK_TP_REACH);
 	}
 
@@ -208,38 +196,57 @@ public final class TeleportConfig {
 	}
 
 	/**
-	 * The serialized form. Field initializers are the defaults, which also apply to keys missing from the file.
+	 * Trims the entries of a server list and drops blank ones.
 	 */
-	private static final class Settings {
-		private boolean enabled = true;
-		private boolean clickTp = false;
-		private int clickTpReach = DEFAULT_CLICK_TP_REACH;
-		private boolean clickTpPreview = true;
-		private boolean singleplayerDefault = true;
-		private boolean multiplayerDefault = true;
-		private boolean resetOnWorldExit = false;
-		private boolean resetOnGameExit = false;
-		private MultiplayerMode multiplayerMode = MultiplayerMode.DISABLED;
-		private List<String> servers = new ArrayList<>();
-
-		/**
-		 * Replaces values Gson could not map (unknown mode names, a missing list), clamps the reach, and tidies the
-		 * server list.
-		 */
-		private void normalize() {
-			this.clickTpReach = clampReach(this.clickTpReach);
-			if (this.multiplayerMode == null) {
-				this.multiplayerMode = MultiplayerMode.DISABLED;
-			}
-			List<String> entries = new ArrayList<>();
-			if (this.servers != null) {
-				for (String entry : this.servers) {
-					if (entry != null && !entry.isBlank()) {
-						entries.add(entry.trim());
-					}
+	private static List<String> normalizedServers(final @Nullable List<String> servers) {
+		List<String> entries = new ArrayList<>();
+		if (servers != null) {
+			for (String entry : servers) {
+				if (entry != null && !entry.isBlank()) {
+					entries.add(entry.trim());
 				}
 			}
-			this.servers = entries;
+		}
+		return entries;
+	}
+
+	/**
+	 * The serialized form. Field initializers are the defaults, which also apply to keys missing from the file. Gson
+	 * ignores keys that no field matches, such as the defaults and reset rules of 1.1.0, so saving drops them.
+	 */
+	private static final class Settings {
+		/** The mode the player chose, or {@code null} until then; Gson leaves it out of the file while it is. */
+		private @Nullable ConfigMode mode;
+		/**
+		 * The on/off state of 1.1.0, which had no modes. Only read, to start such a file in Disabled mode if the mod
+		 * was off; Gson leaves it out of the file once it is {@code null}.
+		 */
+		private @Nullable Boolean enabled;
+		private boolean clickTp = SettingValues.DEFAULTS.clickTp();
+		private int clickTpReach = SettingValues.DEFAULTS.clickTpReach();
+		private boolean clickTpPreview = SettingValues.DEFAULTS.clickTpPreview();
+		private MultiplayerMode multiplayerMode = defaultRules().mode();
+		private List<String> servers = new ArrayList<>(defaultRules().servers());
+
+		private static MultiplayerRules defaultRules() {
+			return Objects.requireNonNull(SettingValues.DEFAULTS.multiplayerRules());
+		}
+
+		/**
+		 * Starts a 1.1.0 file whose mod was off in Disabled mode, replaces values Gson could not map (unknown mode
+		 * names, which count as no choice, a missing list), clamps the reach and tidies the server list.
+		 */
+		private Settings normalized() {
+			if (this.mode == null && Boolean.FALSE.equals(this.enabled)) {
+				this.mode = ConfigMode.DISABLED;
+			}
+			this.enabled = null;
+			this.clickTpReach = clampReach(this.clickTpReach);
+			if (this.multiplayerMode == null) {
+				this.multiplayerMode = defaultRules().mode();
+			}
+			this.servers = normalizedServers(this.servers);
+			return this;
 		}
 	}
 }

@@ -34,10 +34,10 @@ public enum MultiplayerMode implements StringRepresentable {
 	}
 
 	public Component label() {
-		return Component.translatable("options.teleport.multiplayer_mode." + this.name);
+		return Component.translatable(SettingKeys.MULTIPLAYER_MODE + "." + this.name);
 	}
 
 	public Component description() {
-		return Component.translatable("options.teleport.multiplayer_mode." + this.name + ".description");
+		return Component.translatable(SettingKeys.MULTIPLAYER_MODE + "." + this.name + SettingKeys.DESCRIPTION);
 	}
 }

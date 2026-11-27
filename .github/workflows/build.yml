@@ -36,10 +36,23 @@ jobs:
       - name: install headless rendering
         run: sudo apt-get update && sudo apt-get install -y xvfb mesa-vulkan-drivers
       - name: run client game tests
+        timeout-minutes: 20
         run: xvfb-run -a -s "-screen 0 1920x1080x24" ./gradlew runClientGameTest
       - name: capture client game test screenshots
         if: always()
         uses: actions/upload-artifact@v7
         with:
           name: Client game test screenshots
+          path: build/run/clientGameTest/screenshots/
+      # The same tests with the optional OneConfig installed, which offers the OneConfig mode.
+      - name: run client game tests with OneConfig
+        id: oneconfig_tests
+        timeout-minutes: 20
+        run: xvfb-run -a -s "-screen 0 1920x1080x24" ./gradlew runClientGameTest -PoneConfigRuntime=true
+      # Without this condition, a failed first run would upload its own screenshots again under this name.
+      - name: capture client game test screenshots with OneConfig
+        if: always() && steps.oneconfig_tests.outcome != 'skipped'
+        uses: actions/upload-artifact@v7
+        with:
+          name: Client game test screenshots with OneConfig
           path: build/run/clientGameTest/screenshots/

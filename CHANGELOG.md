@@ -6,6 +6,23 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 
 ## [Unreleased]
 
+### Added
+
+- Mod icon.
+- A configuration mode, the first button of the settings screen: **Disabled** turns the mod off everywhere, **Custom** applies the settings on the screen, and **OneConfig** lets [OneConfig](https://modrinth.com/mod/oneconfig) manage the mod. OneConfig is optional; while it is installed and no mode is picked, OneConfig mode applies, and Custom mode otherwise.
+- OneConfig mode: the mod's card in OneConfig turns the mod on and off and is off by default; its page holds **Click TP**, **Click TP Reach** and **Destination Preview**. There are no server rules in OneConfig: once on, the mod teleports in singleplayer and on every server, and OneConfig profiles keep different settings apart. The mod's own screen shows OneConfig's values greyed out and links to them. In OneConfig mode, the **Toggle Click TP** key changes Click TP in OneConfig.
+
+### Changed
+
+- The settings screen only holds the mode, the Click TP settings, the multiplayer mode and the server list. Outside Custom mode, the settings are greyed out and show the values that apply; in OneConfig mode, the multiplayer settings are hidden.
+- The multiplayer mode is now labeled **Multiplayer Mode**.
+- A configuration file from 1.1.0 keeps its other settings and starts in Disabled mode if the mod was turned off.
+
+### Removed
+
+- The **Teleport** on/off setting and the **Toggle teleport** key binding; Disabled mode replaces them.
+- The singleplayer and server defaults and the **Reset on World Exit** and **Reset on Game Exit** rules.
+
 ## [1.1.0+26.3] - 2026-11-16
 
 ### Added

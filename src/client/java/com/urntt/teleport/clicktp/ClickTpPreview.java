@@ -30,12 +30,12 @@ public final class ClickTpPreview {
 		Minecraft minecraft = Minecraft.getInstance();
 		LocalPlayer player = minecraft.player;
 		ClientLevel level = minecraft.level;
-		if (player == null || level == null || !TeleportClient.config().clickTpPreview() || !ClickTp.isActive(player)) {
+		if (player == null || level == null || !TeleportClient.settings().clickTpPreview() || !ClickTp.isActive(player)) {
 			return;
 		}
 
 		float partialTick = deltaTracker.getGameTimeDeltaPartialTick(!level.tickRateManager().isEntityFrozen(player));
-		ClickTp.Target target = ClickTp.findTarget(player, TeleportClient.config().clickTpReach(), partialTick);
+		ClickTp.Target target = ClickTp.findTarget(player, TeleportClient.settings().clickTpReach(), partialTick);
 		if (target == null) {
 			return;
 		}
